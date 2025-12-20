@@ -1,256 +1,119 @@
 # Flurry
 
-## Overview
+**Flurry** is a **Rust-native, GPU-first UI platform** for building deterministic, strongly-typed user interfaces.
 
-Flurry is a **GPU-first, strongly typed UI ecosystem** built with **Rust**.
+Think of it as:
 
-Flurry follows the same fundamental model as the web:
-
-* A **browser** renders websites
-* **Flurry Runtime** renders Flurry applications
-
-Flurry consists of **two distinct but tightly integrated parts**:
-
-1. **Flurry Framework** – a Rust UI framework used by developers to build Flurry applications
-2. **Flurry Runtime** – a browser-like application installed on a user’s machine that loads and runs Flurry applications
-
-Together, they form a platform where UI applications are **compiled**, **typed**, and **rendered deterministically**, without relying on JavaScript, browser engines, or erased types.
-
-Flurry exists to solve a fundamental gap in today’s frontend ecosystem: the lack of a platform where **types, runtime, execution model, and rendering** are part of a single, coherent system.
-
-Flurry is not a JavaScript framework. It does not rely on erased types, browser semantics, or managed runtimes. Instead, it treats UI as a **compiled application problem**, not a scripting problem.
+> **A browser-like runtime for compiled UI apps — without HTML, CSS, or JavaScript.**
 
 ---
 
-## Core Goals
+## What Flurry Is
 
-* **Real Types** – No erased or tooling-only types
-* **Deterministic Execution** – Predictable behavior across environments
-* **GPU-First Rendering** – Modern rendering as the baseline, not an optimization
-* **Native Performance** – Compiled binaries, minimal runtime overhead
-* **Single Mental Model** – One language, one system, one execution model
+Flurry consists of two parts:
 
----
+- **Flurry Framework**
+  A Rust UI framework used by developers to build Flurry apps.
 
-## Design Principles
+- **Flurry Runtime**
+  A browser-like application that loads, isolates, and renders Flurry apps on a user’s machine.
 
-### 1. GPU-First Architecture
+Together, they form a single, coherent UI system where:
 
-Flurry assumes GPU availability by default. Modern laptops, desktops, and mobile devices all ship with integrated GPUs capable of handling UI workloads.
-
-* Primary renderer: **WGPU**
-* Backends: Vulkan, Metal, DX12, WebGPU
-* Performance targets and visual correctness are defined on the GPU path
-
-### 2. Explicit CPU Fallback (Not a Peer)
-
-A CPU renderer exists for:
-
-* Headless environments
-* CI and testing
-* Servers without GPU access
-* Safe fallback on GPU initialization failure
-
-CPU rendering is **best-effort and may degrade gracefully**. It is not a design driver.
-
-* CPU renderer: **TinySkia** (software rasterization)
+- Types are real
+- Layout is deterministic
+- Rendering is GPU-first
+- Behavior is predictable
 
 ---
 
-## Rendering Model
+## What Flurry Is NOT
 
-Flurry enforces a strict separation of concerns:
+Flurry is intentionally **not**:
 
+- A web framework
+- A replacement for HTML, CSS, or JavaScript
+- A browser engine
+- A JavaScript runtime
+- A WebView wrapper
+
+Flurry does **not** inherit DOM semantics, CSS behavior, or JS reactivity models.
+
+---
+
+## Core Principles
+
+Flurry is built around a few non-negotiable ideas:
+
+- **Deterministic layout**
+  Same input → same geometry, always.
+
+- **Strong, real types**
+  No string-based attributes or runtime guessing.
+
+- **GPU-first rendering**
+  The GPU path defines correctness. CPU rendering exists only as a fallback.
+
+- **Explicit behavior**
+  No hidden observers, no magic reactivity, no implicit side effects.
+
+- **Clear separation of concerns**
+  Layout, scene construction, and rendering are strictly separated.
+
+---
+
+## Mental Model
+
+Flurry uses a retained-mode UI model:
+
+1. Developer declares UI (via Rust macros/functions)
+2. Framework builds a typed UI tree
+3. Layout engine computes geometry once
+4. Renderer draws the scene (GPU or CPU)
+
+Renderers:
+
+- Do **not** recompute layout
+- Do **not** run business logic
+- Do **not** mutate state
+
+---
+
+## Example (Conceptual)
+
+```rust
+ui! {
+    column(padding = 16, gap = 8) {
+        text("Login")
+
+        input(id = "email")
+
+        button(on_click = submit) {
+            text("Sign In")
+        }
+    }
+}
 ```
-Layout Engine
-   ↓
-Scene / Display List
-   ↓
-Renderer Backend
-   ├─ WGPU (GPU)
-   └─ TinySkia (CPU)
-```
 
-* Layout and geometry are computed once
-* Rendering backends are interchangeable
-* Renderers never recompute layout or business logic
-
-This guarantees **layout determinism** and **visual consistency** across renderers.
+- This expands into a **typed UI tree**
+- No runtime string parsing
+- No DOM
+- No CSS cascade
 
 ---
 
-## Consistency Guarantees
+## Why a Runtime Exists
 
-Flurry guarantees:
+Flurry apps **never run directly on the OS**.
 
-* Identical layout and geometry between GPU and CPU
-* Identical interaction behavior
-* Visually equivalent output
+All apps run inside the **Flurry Runtime**, which:
 
-Flurry does **not** guarantee:
+- Sandboxes applications
+- Controls access to GPU, input, filesystem, and network
+- Enforces explicit permissions
+- Prevents app-to-app interference
 
-* Bit-perfect pixel output
-* Identical antialiasing or subpixel rendering
-
-This matches industry-standard practices (Flutter, browsers, game engines).
-
----
-
-## Why Flurry Exists
-
-Current UI stacks suffer from:
-
-* Erased or tooling-only types
-* Runtime vs compile-time mismatch
-* Fragmented languages and build pipelines
-* Unpredictable performance characteristics
-
-Flurry is designed to:
-
-* Treat UI as a systems problem
-* Apply backend engineering principles to UI
-* Enable long-term correctness and maintainability
-
----
-
----
-
-## Target Use Cases
-
-* Desktop applications
-* Internal tools and admin dashboards
-* High-performance UI applications
-* Embedded and edge UIs
-* Headless rendering and testing
-* **Hosted Flurry applications rendered inside the Flurry Runtime**
-
-Flurry is **not** intended for:
-
-* SEO-first websites
-* Document-centric web pages
-* Lightweight static sites
-
----
-
-### Why a Runtime Is Required
-
-Flurry is designed as a **runtime-based platform** (similar to a browser) to ensure that Flurry applications **cannot directly exploit or compromise the host machine**.
-
-Without a runtime boundary, compiled UI applications would require broad OS-level access, making it difficult to:
-
-* Enforce permissions
-* Isolate applications from each other
-* Prevent malicious or unintended system access
-
-The **Flurry Runtime exists as a security boundary**.
-
-It is responsible for:
-
-* Sandboxing Flurry applications
-* Controlling access to system resources (GPU, input, filesystem, network)
-* Enforcing explicit permission policies
-* Preventing applications from escaping their execution context
-
-This model mirrors the security guarantees of modern browsers, while retaining native performance and strong typing.
-
----
-
----
-
----
-
-## Framework, Runtime, and Application Model
-
-### Flurry Framework (Developer Side)
-
-* A Rust-based UI framework
-* Used to build **Flurry applications**
-* Produces compiled Flurry app artifacts
-* Enforces strong typing, deterministic layout, and GPU-first rendering
-
-Flurry apps are authored and compiled by developers using Rust and the Flurry Framework.
-
----
-
-### Flurry Runtime (User Side)
-
-The **Flurry Runtime** is a browser-like application that users install on their machine.
-
-It is responsible for:
-
-* Discovering, loading, and executing Flurry applications
-* Providing GPU access, input handling, and window management
-* Enforcing permissions and isolation between apps
-* Managing application lifecycle and updates
-
-Unlike traditional desktop applications:
-
-* Users install **Flurry once**
-* Individual Flurry apps do **not** require OS-level installation
-
----
-
-### Application Distribution Model
-
-* Flurry applications can be hosted in **git-based repositories** (GitHub, GitLab, or self-hosted Git servers)
-* Publishing an app is as simple as pushing to a repository
-* The Flurry Runtime fetches, verifies, and runs applications on demand
-* Applications can be updated independently of the runtime
-
-This model removes traditional packaging and installer complexity while preserving developer control.
-
-It mimics the **deployment simplicity of the web**, without requiring HTML, CSS, or JavaScript.
-
----
-
-### Decoupled Backend Architecture
-
-* Flurry apps are **frontend-only** artifacts
-* Backends are hosted independently (VPS, cloud, on-prem)
-* Apps communicate with their backends over standard protocols (HTTP, gRPC, WebSocket)
-
-This model enables:
-
-* Zero-install user experience
-* Clear separation of UI and backend concerns
-* Stronger security and permission control
-
----
-
-## Governance Model
-
-Flurry follows a **stewarded open-source model**.
-
-* The core team owns the vision and architectural direction
-* Contributions are welcome within defined boundaries
-* Public APIs and major architectural changes require maintainer approval
-
-This model preserves long-term coherence and prevents fragmentation.
-
----
-
-## Team Structure
-
-* **Founder / Steward** – Vision and product direction
-* **Rust Systems Lead** – Core architecture and safety
-* **WGPU Rendering Lead** – GPU pipeline and rendering model
-* **Supporting Developers** – Feature implementation under guidance
-* **Contributors / Volunteers** – Scoped contributions under review
-
----
-
-## Contribution Philosophy
-
-Flurry values:
-
-* Technical correctness over speed
-* Explicit ownership
-* Clear boundaries
-* Small, reviewable changes
-
-Contributions that diverge from the project direction may be declined, even if technically correct.
-
----
+This provides browser-level safety with native performance.
 
 ---
 
@@ -260,23 +123,42 @@ Flurry is in **early foundation stage**.
 
 Current focus:
 
-* Core architecture
-* Rendering abstraction
-* GPU-first pipeline
-* Deterministic layout system
+- Vision locking
+- Public UI API design
+- RFCs and architectural contracts
+- Mock / disposable implementations
 
 APIs are unstable and subject to change.
 
 ---
 
-## License
+## Contribution Philosophy
 
-Flurry is open-source under a permissive license (TBD).
+- Architectural correctness over speed
+- Decisions and contracts matter more than code
+- Early implementations are disposable
+- Public APIs are treated as long-term commitments
+
+Contributions are welcome, but major changes require alignment with the core vision.
 
 ---
 
-## Vision
+## License
 
-Flurry aims to become a **first-class UI platform** where developers can build interfaces with the same confidence, rigor, and correctness they expect from backend systems.
+Open-source.
+License to be finalized.
 
-This project prioritizes **long-term architectural integrity over short-term convenience**.
+---
+
+## Bottom Line
+
+Flurry treats UI as a **systems problem**, not a scripting problem.
+
+It is designed for developers who value:
+
+- Predictability
+- Strong typing
+- Explicit behavior
+- Long-term architectural integrity
+
+If that sounds like you, you’re in the right place.
